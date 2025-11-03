@@ -9,12 +9,7 @@ import (
 	"github.com/lafriks/go-tiled"
 )
 
-//lines 3-87 taken from tilemapdemo repo.
-
-// path to the map.tmx file
-const mapPath = "map.tmx"
-
-// struct for map data
+const mapPath = "level1.tmx" // Path to your Tiled Map.
 type mapGame struct {
 	Level    *tiled.Map
 	tileHash map[uint32]*ebiten.Image
@@ -24,10 +19,8 @@ func (m mapGame) Update() error {
 	return nil
 }
 
-// define screen size  and layout
 func (m mapGame) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
-	//TODO implement me
-	return outsideWidth, outsideHeight
+	return 1500, 2000
 }
 
 func main() {
@@ -40,14 +33,13 @@ func main() {
 		fmt.Printf("error parsing map: %s", err.Error())
 		os.Exit(2)
 	}
-	//create map of ebiten images
 	ebitenImageMap := makeEbiteImagesFromMap(*gameMap)
 	oneLevelGame := mapGame{
 		Level:    gameMap,
 		tileHash: ebitenImageMap,
 	}
-	//print the tile
 	fmt.Println("tilesets:", gameMap.Tilesets[0].Tiles)
+	//fmt.Println("layers:", gameMap.Layers[0].Tiles)
 	fmt.Print("type:", fmt.Sprintf("%T", gameMap.Layers[0].Tiles[0]))
 	err = ebiten.RunGame(&oneLevelGame)
 	if err != nil {
@@ -73,6 +65,7 @@ func (game mapGame) Draw(screen *ebiten.Image) {
 	for tileY := 0; tileY < game.Level.Height; tileY += 1 {
 		for tileX := 0; tileX < game.Level.Width; tileX += 1 {
 			drawOptions.GeoM.Reset()
+
 			TileXpos := float64(game.Level.TileWidth * tileX)
 			TileYpos := float64(game.Level.TileHeight * tileY)
 			drawOptions.GeoM.Translate(TileXpos, TileYpos)

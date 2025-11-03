@@ -3,13 +3,15 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/lafriks/go-tiled"
 )
 
-const mapPath = "level1.tmx" // Path to your Tiled Map.
+const mapPath = "level1.tmx"
+
 type mapGame struct {
 	Level    *tiled.Map
 	tileHash map[uint32]*ebiten.Image
@@ -20,60 +22,74 @@ func (m mapGame) Update() error {
 }
 
 func (m mapGame) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
-	return 1500, 2000
+	return m.Level.Width * m.Level.TileWidth, m.Level.Height * m.Level.TileHeight
 }
 
 func main() {
-	// Parse .tmx file.
 	gameMap, err := tiled.LoadFile(mapPath)
+	if err != nil {
+		fmt.Printf("Error parsing map: %s\n", err.Error())
+		os.Exit(2)
+	}
+
 	windowWidth := gameMap.Width * gameMap.TileWidth
 	windowHeight := gameMap.Height * gameMap.TileHeight
 	ebiten.SetWindowSize(windowWidth, windowHeight)
-	if err != nil {
-		fmt.Printf("error parsing map: %s", err.Error())
-		os.Exit(2)
-	}
-	ebitenImageMap := makeEbiteImagesFromMap(*gameMap)
+	ebiten.SetWindowTitle("Tile Map Game")
+
+	ebitenImageMap := makeEbitenImagesFromMap(*gameMap)
+
 	oneLevelGame := mapGame{
 		Level:    gameMap,
 		tileHash: ebitenImageMap,
 	}
-	fmt.Println("tilesets:", gameMap.Tilesets[0].Tiles)
-	//fmt.Println("layers:", gameMap.Layers[0].Tiles)
-	fmt.Print("type:", fmt.Sprintf("%T", gameMap.Layers[0].Tiles[0]))
-	err = ebiten.RunGame(&oneLevelGame)
-	if err != nil {
+
+	fmt.Println("Tilesets loaded:", len(gameMap.Tilesets[0].Tiles))
+
+	if err := ebiten.RunGame(&oneLevelGame); err != nil {
 		fmt.Println("Couldn't run game:", err)
 	}
 }
-func makeEbiteImagesFromMap(tiledMap tiled.Map) map[uint32]*ebiten.Image {
+
+func makeEbitenImagesFromMap(tiledMap tiled.Map) map[uint32]*ebiten.Image {
 	idToImage := make(map[uint32]*ebiten.Image)
+
 	for _, tile := range tiledMap.Tilesets[0].Tiles {
-		ebitenImageTile, _, err :=
-			ebitenutil.NewImageFromFile(tile.Image.Source)
-		if err != nil {
-			fmt.Println("Error loading tile image:",
-				tile.Image.Source, err)
+		imgPath := tile.Image.Source
+
+		if _, err := os.Stat(imgPath); os.IsNotExist(err) {
+			imgPath = filepath.Join("tiles", filepath.Base(imgPath))
 		}
+
+		ebitenImageTile, _, err := ebitenutil.NewImageFromFile(imgPath)
+		if err != nil {
+			fmt.Println("Error loading tile image:", imgPath, err)
+			continue
+		}
+
 		idToImage[tile.ID] = ebitenImageTile
 	}
+
 	return idToImage
 }
 
 func (game mapGame) Draw(screen *ebiten.Image) {
 	drawOptions := ebiten.DrawImageOptions{}
-	for tileY := 0; tileY < game.Level.Height; tileY += 1 {
-		for tileX := 0; tileX < game.Level.Width; tileX += 1 {
+
+	for tileY := 0; tileY < game.Level.Height; tileY++ {
+		for tileX := 0; tileX < game.Level.Width; tileX++ {
 			drawOptions.GeoM.Reset()
 
 			TileXpos := float64(game.Level.TileWidth * tileX)
 			TileYpos := float64(game.Level.TileHeight * tileY)
 			drawOptions.GeoM.Translate(TileXpos, TileYpos)
-			tileToDraw :=
-				game.Level.Layers[0].Tiles[tileY*game.Level.Width+tileX]
+
+			tileToDraw := game.Level.Layers[0].Tiles[tileY*game.Level.Width+tileX]
 			ebitenTileToDraw := game.tileHash[tileToDraw.ID]
-			screen.DrawImage(ebitenTileToDraw,
-				&drawOptions)
+
+			if ebitenTileToDraw != nil {
+				screen.DrawImage(ebitenTileToDraw, &drawOptions)
+			}
 		}
 	}
 }

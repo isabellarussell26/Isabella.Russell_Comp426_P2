@@ -25,8 +25,9 @@ type mapGame struct {
 	player      player                   //sprite for squirel
 	playerImage *ebiten.Image            ///squirl sprite
 	drawOps     ebiten.DrawImageOptions
-	acorns      []*acorn     //slice for acorns
-	chocolate   []*chocolate // slice for chocolate
+	acorns      []*acorn      //slice for acorns
+	chocolate   []*chocolate  // slice for chocolate
+	gateImage   *ebiten.Image //gate field
 }
 
 // player struct
@@ -124,6 +125,13 @@ func (m *mapGame) Draw(screen *ebiten.Image) {
 		world.DrawImage(c.pict, &chocolateOps)
 	}
 
+	if m.gateImage != nil {
+		gateOps := ebiten.DrawImageOptions{}
+		gateOps.GeoM.Scale(0.10, 0.10)     // adjust scale to make it visible
+		gateOps.GeoM.Translate(1200, 1200) // bottom-right position
+		world.DrawImage(m.gateImage, &gateOps)
+	}
+
 	//draw player on top of map and acorns
 	playerOps := ebiten.DrawImageOptions{}
 	playerOps.GeoM.Scale(0.08, 0.08)                                   //scale player down to be reasonable
@@ -186,6 +194,11 @@ func main() {
 		y := rand.Intn(1250)
 		chocolateList = append(chocolateList, &chocolate{pict: chocolateImg, xLoc: float64(x), yLoc: float64(y)})
 	}
+	//load gateimage
+	gateImg, _, err := ebitenutil.NewImageFromFile("gate.png")
+	if err != nil {
+		log.Fatal("Failed to load gate image:", err)
+	}
 
 	// initialize the game
 	game := &mapGame{
@@ -196,6 +209,7 @@ func main() {
 		playerImage: playerImg,
 		acorns:      acornList,
 		chocolate:   chocolateList,
+		gateImage:   gateImg,
 	}
 
 	fmt.Println("Tilesets loaded:", len(gameMap.Tilesets[0].Tiles))

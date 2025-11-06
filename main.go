@@ -170,8 +170,8 @@ func main() {
 	//initialize 15 acorns at random positions
 	acornList := make([]*acorn, 0)
 	for i := 0; i < 15; i++ {
-		x := rand.Intn(800)
-		y := rand.Intn(800)
+		x := rand.Intn(1250)
+		y := rand.Intn(1250)
 		acornList = append(acornList, &acorn{pict: acornImg, xLoc: float64(x), yLoc: float64(y)})
 	}
 	//load chcolate image
@@ -182,8 +182,8 @@ func main() {
 	//init 5 chocolate items
 	chocolateList := make([]*chocolate, 0)
 	for i := 0; i < 5; i++ {
-		x := rand.Intn(800)
-		y := rand.Intn(800)
+		x := rand.Intn(1250)
+		y := rand.Intn(1250)
 		chocolateList = append(chocolateList, &chocolate{pict: chocolateImg, xLoc: float64(x), yLoc: float64(y)})
 	}
 

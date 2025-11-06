@@ -4,6 +4,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"path/filepath"
 
@@ -24,11 +25,28 @@ type mapGame struct {
 	player      player                   //sprite for squirel
 	playerImage *ebiten.Image            ///squirl sprite
 	drawOps     ebiten.DrawImageOptions
+	acorns      []*acorn //slice for acorns
 }
 
 // player struct
 type player struct {
 	x, y int //players x and y locations
+}
+
+// acorn struct
+type acorn struct {
+	pict *ebiten.Image
+	xLoc float64
+	yLoc float64
+}
+
+// create a new acorn at a random location
+func NewAcorn(maxX, maxY int, image *ebiten.Image) *acorn {
+	return &acorn{
+		pict: image,
+		xLoc: float64(rand.Intn(maxX)),
+		yLoc: float64(rand.Intn(maxY)),
+	}
 }
 
 func (m *mapGame) Update() error {
@@ -40,7 +58,7 @@ func (m *mapGame) Update() error {
 	if ebiten.IsKeyPressed(ebiten.KeyRight) && m.player.x < 1250 {
 		m.player.x += 5
 	}
-	//up til 0 to keeo on map
+	//up til 0 to keep on map
 	if ebiten.IsKeyPressed(ebiten.KeyUp) && m.player.y > 0 {
 		m.player.y -= 5
 	}
@@ -59,10 +77,11 @@ func (m *mapGame) Update() error {
 func (m *mapGame) Draw(screen *ebiten.Image) {
 	m.drawOps.GeoM.Reset()
 
+	//create world image to draw map and objects
 	world := ebiten.NewImage(m.Level.Width*m.Level.TileWidth, m.Level.Height*m.Level.TileHeight)
 	tileDrawOps := ebiten.DrawImageOptions{}
 
-	//draws the tiledmpa on the screen
+	//draws the tiled map on the screen
 	for tileY := 0; tileY < m.Level.Height; tileY++ {
 		for tileX := 0; tileX < m.Level.Width; tileX++ {
 			tileDrawOps.GeoM.Reset()
@@ -76,12 +95,22 @@ func (m *mapGame) Draw(screen *ebiten.Image) {
 		}
 	}
 
+	//draw the acorns on top of the map
+	for _, a := range m.acorns {
+		acornOps := ebiten.DrawImageOptions{}
+		acornOps.GeoM.Scale(0.01, 0.01) //scale acorn down to be reasonable
+		acornOps.GeoM.Translate(a.xLoc, a.yLoc)
+		world.DrawImage(a.pict, &acornOps)
+	}
+
+	//draw player on top of map and acorns
 	playerOps := ebiten.DrawImageOptions{}
-	playerOps.GeoM.Scale(0.015, 0.015)                                 //scale player down to be reaosnable
+	playerOps.GeoM.Scale(0.08, 0.08)                                   //scale player down to be reasonable
 	playerOps.GeoM.Translate(float64(m.player.x), float64(m.player.y)) //move player to its current x or y
 	world.DrawImage(m.playerImage, &playerOps)                         //draw player into map
 
-	m.cameraView.Draw(world, screen) //show visible part of screen on map
+	//show visible part of screen on map
+	m.cameraView.Draw(world, screen)
 }
 
 // define screen layout
@@ -96,6 +125,7 @@ func main() {
 		fmt.Printf("Error parsing map: %s\n", err.Error())
 		os.Exit(2)
 	}
+
 	//set window size
 	ebiten.SetWindowSize(1000, 1000)
 	ebiten.SetWindowTitle("Squirrel Game")
@@ -105,9 +135,23 @@ func main() {
 	ourCamera := camera.Init(0, 0)
 
 	// Load the squirel image
-	playerImg, _, err := ebitenutil.NewImageFromFile("player.png")
+	playerImg, _, err := ebitenutil.NewImageFromFile("playerRight.png")
 	if err != nil {
 		log.Fatal("Failed to load player image:", err)
+	}
+
+	// Load acorn image
+	acornImg, _, err := ebitenutil.NewImageFromFile("acorn.png")
+	if err != nil {
+		log.Fatal("Failed to load acorn image:", err)
+	}
+
+	//initialize 15 acorns at random positions
+	acornList := make([]*acorn, 0)
+	for i := 0; i < 15; i++ {
+		x := rand.Intn(800)
+		y := rand.Intn(800)
+		acornList = append(acornList, &acorn{pict: acornImg, xLoc: float64(x), yLoc: float64(y)})
 	}
 
 	// initialize the game
@@ -117,6 +161,7 @@ func main() {
 		cameraView:  ourCamera,
 		player:      player{x: 0, y: 0},
 		playerImage: playerImg,
+		acorns:      acornList,
 	}
 
 	fmt.Println("Tilesets loaded:", len(gameMap.Tilesets[0].Tiles))
@@ -125,7 +170,7 @@ func main() {
 	}
 }
 
-// load tiles from tilemap, creatre map.loop through all of the riles and create the image
+// load tiles from tilemap, create map, loop through all of the tiles and create the image
 func makeEbitenImagesFromMap(tiledMap tiled.Map) map[uint32]*ebiten.Image {
 	idToImage := make(map[uint32]*ebiten.Image)
 

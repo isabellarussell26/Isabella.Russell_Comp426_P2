@@ -5,6 +5,7 @@ go 1.25
 require (
 	github.com/hajimehoshi/ebiten/v2 v2.9.3
 	github.com/lafriks/go-tiled v0.14.0
+	github.com/solarlune/resolv v0.8.1
 	github.com/tducasse/ebiten-camera v0.0.0-20220322101136-d16bc861ea8e
 )
 

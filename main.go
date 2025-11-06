@@ -11,6 +11,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/lafriks/go-tiled"
+	"github.com/solarlune/resolv"
 	camera "github.com/tducasse/ebiten-camera"
 )
 
@@ -19,15 +20,17 @@ const mapPath = "level1.tmx"
 
 // mapgame struct
 type mapGame struct {
-	Level       *tiled.Map               //pointer to tmx file
-	tileHash    map[uint32]*ebiten.Image //map tile ids
-	cameraView  *camera.Camera           //pointer to camera for what will be visible
-	player      player                   //sprite for squirel
-	playerImage *ebiten.Image            ///squirl sprite
-	drawOps     ebiten.DrawImageOptions
-	acorns      []*acorn      //slice for acorns
-	chocolate   []*chocolate  // slice for chocolate
-	gateImage   *ebiten.Image //gate field
+	Level          *tiled.Map               //pointer to tmx file
+	tileHash       map[uint32]*ebiten.Image //map tile ids
+	cameraView     *camera.Camera           //pointer to camera for what will be visible
+	player         player                   //sprite for squirel
+	playerImage    *ebiten.Image            ///squirl sprite
+	drawOps        ebiten.DrawImageOptions
+	acorns         []*acorn     //slice for acorns
+	chocolates     []*chocolate //slice for chocolates
+	acornImage     *ebiten.Image
+	chocolateImage *ebiten.Image
+	gateImage      *ebiten.Image
 }
 
 // player struct
@@ -41,6 +44,8 @@ type acorn struct {
 	xLoc float64
 	yLoc float64
 }
+
+// chocolate struct
 type chocolate struct {
 	pict *ebiten.Image
 	xLoc float64
@@ -56,7 +61,7 @@ func NewAcorn(maxX, maxY int, image *ebiten.Image) *acorn {
 	}
 }
 
-// create new chocolate at rand location
+// create a new chocolate at a random location
 func NewChocolate(maxX, maxY int, image *ebiten.Image) *chocolate {
 	return &chocolate{
 		pict: image,
@@ -87,17 +92,33 @@ func (m *mapGame) Update() error {
 	m.cameraView.Follow.W = m.player.x
 	m.cameraView.Follow.H = m.player.y
 
+	// check for player hitting the gate
+	playerBox := m.PlayerHitbox()
+	gateBox := m.GateHitbox()
+	if len(playerBox.Intersection(gateBox).Intersections) > 0 {
+		// Player reached the gate → load level2
+		newMap, err := tiled.LoadFile("level2.tmx")
+		if err != nil {
+			log.Fatal("Failed to load level2:", err)
+		}
+		m.Level = newMap
+		m.tileHash = makeEbitenImagesFromMap(*newMap)
+
+		// Reset player position
+		m.player.x = 0
+		m.player.y = 0
+	}
+
 	return nil
 }
 
 func (m *mapGame) Draw(screen *ebiten.Image) {
 	m.drawOps.GeoM.Reset()
 
-	//create world image to draw map and objects
 	world := ebiten.NewImage(m.Level.Width*m.Level.TileWidth, m.Level.Height*m.Level.TileHeight)
 	tileDrawOps := ebiten.DrawImageOptions{}
 
-	//draws the tiled map on the screen
+	//draws the tiledmpa on the screen
 	for tileY := 0; tileY < m.Level.Height; tileY++ {
 		for tileX := 0; tileX < m.Level.Width; tileX++ {
 			tileDrawOps.GeoM.Reset()
@@ -111,40 +132,57 @@ func (m *mapGame) Draw(screen *ebiten.Image) {
 		}
 	}
 
-	//draw the acorns on top of the map
+	//draw the acorns
 	for _, a := range m.acorns {
 		acornOps := ebiten.DrawImageOptions{}
-		acornOps.GeoM.Scale(0.009, 0.009) //scale acorn down to be reasonable
+		acornOps.GeoM.Scale(0.01, 0.01)
 		acornOps.GeoM.Translate(a.xLoc, a.yLoc)
 		world.DrawImage(a.pict, &acornOps)
 	}
-	for _, c := range m.chocolate {
+
+	//draw the chocolates
+	for _, c := range m.chocolates {
 		chocolateOps := ebiten.DrawImageOptions{}
-		chocolateOps.GeoM.Scale(0.005, 0.005) //scale acorn down to be reasonable
+		chocolateOps.GeoM.Scale(0.005, 0.005)
 		chocolateOps.GeoM.Translate(c.xLoc, c.yLoc)
 		world.DrawImage(c.pict, &chocolateOps)
 	}
 
+	//draw gate in bottom right
 	if m.gateImage != nil {
 		gateOps := ebiten.DrawImageOptions{}
-		gateOps.GeoM.Scale(0.10, 0.10)     // adjust scale to make it visible
-		gateOps.GeoM.Translate(1200, 1200) // bottom-right position
+		gateOps.GeoM.Scale(0.10, 0.10)
+		gateOps.GeoM.Translate(1220, 1220)
 		world.DrawImage(m.gateImage, &gateOps)
 	}
 
-	//draw player on top of map and acorns
 	playerOps := ebiten.DrawImageOptions{}
-	playerOps.GeoM.Scale(0.08, 0.08)                                   //scale player down to be reasonable
+	playerOps.GeoM.Scale(0.05, 0.05)                                   //scale player down to be reaosnable
 	playerOps.GeoM.Translate(float64(m.player.x), float64(m.player.y)) //move player to its current x or y
 	world.DrawImage(m.playerImage, &playerOps)                         //draw player into map
 
-	//show visible part of screen on map
-	m.cameraView.Draw(world, screen)
+	m.cameraView.Draw(world, screen) //show visible part of screen on map
 }
 
 // define screen layout
 func (m *mapGame) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
 	return outsideWidth, outsideHeight
+}
+
+// hitbox for player
+func (m *mapGame) PlayerHitbox() *resolv.ConvexPolygon {
+	scaleFactor := 0.05
+	w := float64(m.playerImage.Bounds().Dx()) * scaleFactor
+	h := float64(m.playerImage.Bounds().Dy()) * scaleFactor
+	return resolv.NewRectangle(float64(m.player.x), float64(m.player.y), w, h)
+}
+
+// hitbox for gate
+func (m *mapGame) GateHitbox() *resolv.ConvexPolygon {
+	scaleFactor := 0.05
+	w := float64(m.gateImage.Bounds().Dx()) * scaleFactor
+	h := float64(m.gateImage.Bounds().Dy()) * scaleFactor
+	return resolv.NewRectangle(1250, 1250, w, h)
 }
 
 func main() {
@@ -154,7 +192,6 @@ func main() {
 		fmt.Printf("Error parsing map: %s\n", err.Error())
 		os.Exit(2)
 	}
-
 	//set window size
 	ebiten.SetWindowSize(1000, 1000)
 	ebiten.SetWindowTitle("Squirrel Game")
@@ -175,41 +212,41 @@ func main() {
 		log.Fatal("Failed to load acorn image:", err)
 	}
 
-	//initialize 15 acorns at random positions
-	acornList := make([]*acorn, 0)
-	for i := 0; i < 15; i++ {
-		x := rand.Intn(1250)
-		y := rand.Intn(1250)
-		acornList = append(acornList, &acorn{pict: acornImg, xLoc: float64(x), yLoc: float64(y)})
-	}
-	//load chcolate image
+	// Load chocolate image
 	chocolateImg, _, err := ebitenutil.NewImageFromFile("chocolate.png")
 	if err != nil {
 		log.Fatal("Failed to load chocolate image:", err)
 	}
-	//init 5 chocolate items
-	chocolateList := make([]*chocolate, 0)
-	for i := 0; i < 5; i++ {
-		x := rand.Intn(1250)
-		y := rand.Intn(1250)
-		chocolateList = append(chocolateList, &chocolate{pict: chocolateImg, xLoc: float64(x), yLoc: float64(y)})
-	}
-	//load gateimage
+
+	// Load gate image
 	gateImg, _, err := ebitenutil.NewImageFromFile("gate.png")
 	if err != nil {
 		log.Fatal("Failed to load gate image:", err)
 	}
 
+	// initialize acorns and chocolates randomly across map
+	acornList := make([]*acorn, 0)
+	for i := 0; i < 15; i++ {
+		acornList = append(acornList, NewAcorn(gameMap.Width*gameMap.TileWidth, gameMap.Height*gameMap.TileHeight, acornImg))
+	}
+
+	chocolateList := make([]*chocolate, 0)
+	for i := 0; i < 5; i++ {
+		chocolateList = append(chocolateList, NewChocolate(gameMap.Width*gameMap.TileWidth, gameMap.Height*gameMap.TileHeight, chocolateImg))
+	}
+
 	// initialize the game
 	game := &mapGame{
-		Level:       gameMap,
-		tileHash:    ebitenImageMap,
-		cameraView:  ourCamera,
-		player:      player{x: 0, y: 0},
-		playerImage: playerImg,
-		acorns:      acornList,
-		chocolate:   chocolateList,
-		gateImage:   gateImg,
+		Level:          gameMap,
+		tileHash:       ebitenImageMap,
+		cameraView:     ourCamera,
+		player:         player{x: 0, y: 0},
+		playerImage:    playerImg,
+		acorns:         acornList,
+		chocolates:     chocolateList,
+		acornImage:     acornImg,
+		chocolateImage: chocolateImg,
+		gateImage:      gateImg,
 	}
 
 	fmt.Println("Tilesets loaded:", len(gameMap.Tilesets[0].Tiles))
@@ -218,7 +255,7 @@ func main() {
 	}
 }
 
-// load tiles from tilemap, create map, loop through all of the tiles and create the image
+// load tiles from tilemap, creatre map.loop through all of the riles and create the image
 func makeEbitenImagesFromMap(tiledMap tiled.Map) map[uint32]*ebiten.Image {
 	idToImage := make(map[uint32]*ebiten.Image)
 

@@ -25,7 +25,8 @@ type mapGame struct {
 	player      player                   //sprite for squirel
 	playerImage *ebiten.Image            ///squirl sprite
 	drawOps     ebiten.DrawImageOptions
-	acorns      []*acorn //slice for acorns
+	acorns      []*acorn     //slice for acorns
+	chocolate   []*chocolate // slice for chocolate
 }
 
 // player struct
@@ -39,10 +40,24 @@ type acorn struct {
 	xLoc float64
 	yLoc float64
 }
+type chocolate struct {
+	pict *ebiten.Image
+	xLoc float64
+	yLoc float64
+}
 
 // create a new acorn at a random location
 func NewAcorn(maxX, maxY int, image *ebiten.Image) *acorn {
 	return &acorn{
+		pict: image,
+		xLoc: float64(rand.Intn(maxX)),
+		yLoc: float64(rand.Intn(maxY)),
+	}
+}
+
+// create new chocolate at rand location
+func NewChocolate(maxX, maxY int, image *ebiten.Image) *chocolate {
+	return &chocolate{
 		pict: image,
 		xLoc: float64(rand.Intn(maxX)),
 		yLoc: float64(rand.Intn(maxY)),
@@ -98,9 +113,15 @@ func (m *mapGame) Draw(screen *ebiten.Image) {
 	//draw the acorns on top of the map
 	for _, a := range m.acorns {
 		acornOps := ebiten.DrawImageOptions{}
-		acornOps.GeoM.Scale(0.01, 0.01) //scale acorn down to be reasonable
+		acornOps.GeoM.Scale(0.009, 0.009) //scale acorn down to be reasonable
 		acornOps.GeoM.Translate(a.xLoc, a.yLoc)
 		world.DrawImage(a.pict, &acornOps)
+	}
+	for _, c := range m.chocolate {
+		chocolateOps := ebiten.DrawImageOptions{}
+		chocolateOps.GeoM.Scale(0.005, 0.005) //scale acorn down to be reasonable
+		chocolateOps.GeoM.Translate(c.xLoc, c.yLoc)
+		world.DrawImage(c.pict, &chocolateOps)
 	}
 
 	//draw player on top of map and acorns
@@ -153,6 +174,18 @@ func main() {
 		y := rand.Intn(800)
 		acornList = append(acornList, &acorn{pict: acornImg, xLoc: float64(x), yLoc: float64(y)})
 	}
+	//load chcolate image
+	chocolateImg, _, err := ebitenutil.NewImageFromFile("chocolate.png")
+	if err != nil {
+		log.Fatal("Failed to load chocolate image:", err)
+	}
+	//init 5 chocolate items
+	chocolateList := make([]*chocolate, 0)
+	for i := 0; i < 5; i++ {
+		x := rand.Intn(800)
+		y := rand.Intn(800)
+		chocolateList = append(chocolateList, &chocolate{pict: chocolateImg, xLoc: float64(x), yLoc: float64(y)})
+	}
 
 	// initialize the game
 	game := &mapGame{
@@ -162,6 +195,7 @@ func main() {
 		player:      player{x: 0, y: 0},
 		playerImage: playerImg,
 		acorns:      acornList,
+		chocolate:   chocolateList,
 	}
 
 	fmt.Println("Tilesets loaded:", len(gameMap.Tilesets[0].Tiles))

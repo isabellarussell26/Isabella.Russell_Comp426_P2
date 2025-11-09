@@ -36,6 +36,7 @@ type mapGame struct {
 	gateImage      *ebiten.Image
 	score          int // number of acorns collected
 	showGate       bool
+	gameOver       bool // flag for game over state
 }
 
 // player struct
@@ -74,7 +75,13 @@ func NewChocolate(maxX, maxY int, image *ebiten.Image) *chocolate {
 		yLoc: float64(rand.Intn(maxY)),
 	}
 }
+
 func (m *mapGame) Update() error {
+	// stop all updates if game over
+	if m.gameOver {
+		return nil
+	}
+
 	//moving left so player doesnt go off screen
 	if ebiten.IsKeyPressed(ebiten.KeyLeft) && m.player.x > 0 {
 		m.player.x -= 5
@@ -105,15 +112,14 @@ func (m *mapGame) Update() error {
 	// check acorn collection
 	newAcorns := m.acorns[:0]
 	for _, a := range m.acorns {
-		acornCenterX := a.xLoc + float64(a.pict.Bounds().Dx())*scale/2
-		acornCenterY := a.yLoc + float64(a.pict.Bounds().Dy())*scale/2
-
+		acornCenterX := a.xLoc + float64(a.pict.Bounds().Dx())*0.01/2
+		acornCenterY := a.yLoc + float64(a.pict.Bounds().Dy())*0.01/2
 		dx := playerCenterX - acornCenterX
 		dy := playerCenterY - acornCenterY
 		distanceSquared := dx*dx + dy*dy
 
 		// collision radius (half width of player + half width of acorn)
-		radius := (float64(m.playerImage.Bounds().Dx())*scale + float64(a.pict.Bounds().Dx())*scale) / 2
+		radius := (float64(m.playerImage.Bounds().Dx())*scale + float64(a.pict.Bounds().Dx())*0.01) / 2
 
 		if distanceSquared <= radius*radius {
 			m.score++
@@ -132,7 +138,6 @@ func (m *mapGame) Update() error {
 	if m.showGate && m.gateImage != nil {
 		playerHB := m.PlayerHitbox()
 		gateHB := m.GateHitbox()
-
 		if len(playerHB.Intersection(gateHB).Intersections) > 0 {
 			// load level2 tmx
 			gameMap, err := tiled.LoadFile("level2.tmx")
@@ -151,21 +156,40 @@ func (m *mapGame) Update() error {
 		}
 	}
 
+	// check collision with chocolate to trigger game over
+	for _, c := range m.chocolates {
+		if len(m.PlayerHitbox().Intersection(c.Hitbox()).Intersections) > 0 {
+			m.gameOver = true
+			break
+		}
+	}
+
 	return nil
 }
 
 func (m *mapGame) Draw(screen *ebiten.Image) {
-	m.drawOps.GeoM.Reset()
+	// draw game over screen if triggered
+	if m.gameOver {
+		screen.Fill(colornames.Black)
+		drawFace := text.NewGoXFace(basicfont.Face7x13)
+		textOpts := &text.DrawOptions{}
+		textOpts.GeoM.Reset()
+		textOpts.GeoM.Scale(6.0, 6.0)
+		screenW, screenH := ebiten.WindowSize()
+		textOpts.GeoM.Translate(float64(screenW)/2-150, float64(screenH)/2-40)
+		textOpts.ColorScale.ScaleWithColor(colornames.Red)
+		text.Draw(screen, "Game Over", drawFace, textOpts)
+		return
+	}
 
+	m.drawOps.GeoM.Reset()
 	world := ebiten.NewImage(m.Level.Width*m.Level.TileWidth, m.Level.Height*m.Level.TileHeight)
 	tileDrawOps := ebiten.DrawImageOptions{}
-
 	//draws the tiledmpa on the screen
 	for tileY := 0; tileY < m.Level.Height; tileY++ {
 		for tileX := 0; tileX < m.Level.Width; tileX++ {
 			tileDrawOps.GeoM.Reset()
 			tileDrawOps.GeoM.Translate(float64(tileX*m.Level.TileWidth), float64(tileY*m.Level.TileHeight))
-
 			tile := m.Level.Layers[0].Tiles[tileY*m.Level.Width+tileX]
 			img := m.tileHash[tile.ID]
 			if img != nil {
@@ -207,14 +231,10 @@ func (m *mapGame) Draw(screen *ebiten.Image) {
 
 	// draw the score at top right of screen so player knows how many acrons they have
 	drawFace := text.NewGoXFace(basicfont.Face7x13)
-	textOpts := &text.DrawOptions{
-		DrawImageOptions: ebiten.DrawImageOptions{},
-		LayoutOptions:    text.LayoutOptions{},
-	}
+	textOpts := &text.DrawOptions{}
 	textOpts.GeoM.Reset()
 	textOpts.GeoM.Scale(3.0, 3.0)
 	screenW, _ := ebiten.WindowSize()
-	// place near top-right; adjust X offset so it is visible and not cut off
 	textOpts.GeoM.Translate(float64(screenW-200), 30)
 	textOpts.ColorScale.ScaleWithColor(colornames.Red)
 	text.Draw(screen, fmt.Sprintf("Acorns: %d", m.score), drawFace, textOpts)
@@ -250,6 +270,16 @@ func (a *acorn) Hitbox() *resolv.ConvexPolygon {
 	h := float64(a.pict.Bounds().Dy()) * scale
 	x := a.xLoc + w/2
 	y := a.yLoc + h/2
+	return resolv.NewRectangle(x-w/2, y-h/2, w, h)
+}
+
+// hitbox for chocolate
+func (c *chocolate) Hitbox() *resolv.ConvexPolygon {
+	scale := 0.01 // same as chocolate draw scale
+	w := float64(c.pict.Bounds().Dx()) * scale
+	h := float64(c.pict.Bounds().Dy()) * scale
+	x := c.xLoc + w/2
+	y := c.yLoc + h/2
 	return resolv.NewRectangle(x-w/2, y-h/2, w, h)
 }
 

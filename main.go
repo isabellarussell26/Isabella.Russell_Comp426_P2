@@ -1,7 +1,8 @@
 package main
 
-//import all necessary imports
 import (
+	"bytes"
+	_ "embed"
 	"fmt"
 	"log"
 	"math/rand"
@@ -18,7 +19,32 @@ import (
 	"golang.org/x/image/font/basicfont"
 )
 
-// define a mappath constant of the tiled tmx file
+// embed all assets
+
+//go:embed level1.tmx
+var level1Data []byte
+
+//go:embed level2.tmx
+var level2Data []byte
+
+//go:embed assets/playerRight.png
+var playerImgData []byte
+
+//go:embed assets/acorn.png
+var acornImgData []byte
+
+//go:embed assets/chocolate.png
+var chocolateImgData []byte
+
+//go:embed assets/gate.png
+var gateImgData []byte
+
+//go:embed assets/NPC1.png
+var npc1ImgData []byte
+
+//go:embed assets/NPC2.png
+var npc2ImgData []byte
+
 const mapPath = "level1.tmx"
 
 // mapgame struct
@@ -341,12 +367,13 @@ func (c *chocolate) Hitbox() *resolv.ConvexPolygon {
 }
 
 func main() {
-	//load tile map
+	//load tile map from embedded
 	gameMap, err := tiled.LoadFile(mapPath)
 	if err != nil {
 		fmt.Printf("Error parsing map: %s\n", err.Error())
 		os.Exit(2)
 	}
+
 	//set window size
 	ebiten.SetWindowSize(1000, 1000)
 	ebiten.SetWindowTitle("Squirrel Game")
@@ -356,35 +383,35 @@ func main() {
 	ourCamera := camera.Init(0, 0)
 
 	// Load the squirel image
-	playerImg, _, err := ebitenutil.NewImageFromFile("playerRight.png")
+	playerImg, _, err := ebitenutil.NewImageFromReader(bytes.NewReader(playerImgData))
 	if err != nil {
 		log.Fatal("Failed to load player image:", err)
 	}
 
 	// Load acorn image
-	acornImg, _, err := ebitenutil.NewImageFromFile("acorn.png")
+	acornImg, _, err := ebitenutil.NewImageFromReader(bytes.NewReader(acornImgData))
 	if err != nil {
 		log.Fatal("Failed to load acorn image:", err)
 	}
 
 	// Load chocolate image
-	chocolateImg, _, err := ebitenutil.NewImageFromFile("chocolate.png")
+	chocolateImg, _, err := ebitenutil.NewImageFromReader(bytes.NewReader(chocolateImgData))
 	if err != nil {
 		log.Fatal("Failed to load chocolate image:", err)
 	}
 
 	// Load gate image
-	gateImg, _, err := ebitenutil.NewImageFromFile("gate.png")
+	gateImg, _, err := ebitenutil.NewImageFromReader(bytes.NewReader(gateImgData))
 	if err != nil {
 		log.Fatal("Failed to load gate image:", err)
 	}
 
 	// Load NPC images
-	npc1Img, _, err := ebitenutil.NewImageFromFile("NPC1.png")
+	npc1Img, _, err := ebitenutil.NewImageFromReader(bytes.NewReader(npc1ImgData))
 	if err != nil {
 		log.Fatal("Failed to load NPC1 image:", err)
 	}
-	npc2Img, _, err := ebitenutil.NewImageFromFile("NPC2.png")
+	npc2Img, _, err := ebitenutil.NewImageFromReader(bytes.NewReader(npc2ImgData))
 	if err != nil {
 		log.Fatal("Failed to load NPC2 image:", err)
 	}

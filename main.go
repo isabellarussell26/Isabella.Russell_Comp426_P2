@@ -34,9 +34,14 @@ type mapGame struct {
 	acornImage     *ebiten.Image
 	chocolateImage *ebiten.Image
 	gateImage      *ebiten.Image
-	score          int // number of acorns collected
-	showGate       bool
-	gameOver       bool // flag for game over state
+	score          int           // number of acorns collected
+	showGate       bool          // whether gate should show
+	gameOver       bool          // flag for game over state
+	npc1           *npc          //pointer to npc1
+	npc2           *npc          //pointer to npc2
+	npc1Image      *ebiten.Image //to draw npcs
+	npc2Image      *ebiten.Image
+	showNPCs       bool //for if the NPCs will be on screen
 }
 
 // player struct
@@ -56,6 +61,29 @@ type chocolate struct {
 	pict *ebiten.Image
 	xLoc float64
 	yLoc float64
+}
+
+// npc struct
+type npc struct {
+	pict  *ebiten.Image //pointer to image
+	x, y  float64       //current position
+	dir   int           // left or right
+	speed float64
+	minX  float64 // min movement
+	maxX  float64 // max movement
+	time  int     //for npc movement - used ai
+}
+
+// update NPC movement- used ai
+func (n *npc) Update() {
+	n.time++ //increment time
+	if n.minX != n.maxX {
+		n.x += n.speed * float64(n.dir) //move npc on x axis
+		//when npc hits max or min bound, will go other way
+		if n.x < n.minX || n.x > n.maxX {
+			n.dir *= -1
+		}
+	}
 }
 
 // create a new acorn at a random location
@@ -112,19 +140,19 @@ func (m *mapGame) Update() error {
 	// check acorn collection
 	newAcorns := m.acorns[:0]
 	for _, a := range m.acorns {
-		acornCenterX := a.xLoc + float64(a.pict.Bounds().Dx())*0.01/2
+		acornCenterX := a.xLoc + float64(a.pict.Bounds().Dx())*0.01/2 //center of acorn so hitbox when its actually touching the acron
 		acornCenterY := a.yLoc + float64(a.pict.Bounds().Dy())*0.01/2
-		dx := playerCenterX - acornCenterX
-		dy := playerCenterY - acornCenterY
-		distanceSquared := dx*dx + dy*dy
+		dx := playerCenterX - acornCenterX //x distance from acorn
+		dy := playerCenterY - acornCenterY //y distance form acorn
+		distanceSquared := dx*dx + dy*dy   //used ai- "squared distance between player and acron"
 
 		// collision radius (half width of player + half width of acorn)
 		radius := (float64(m.playerImage.Bounds().Dx())*scale + float64(a.pict.Bounds().Dx())*0.01) / 2
 
 		if distanceSquared <= radius*radius {
-			m.score++
+			m.score++ //if the distance player is from acron is a coliision- increase score
 		} else {
-			newAcorns = append(newAcorns, a)
+			newAcorns = append(newAcorns, a) //if not collision keep it in same spot
 		}
 	}
 	m.acorns = newAcorns
@@ -142,10 +170,10 @@ func (m *mapGame) Update() error {
 			// load level2 tmx
 			gameMap, err := tiled.LoadFile("level2.tmx")
 			if err != nil {
-				log.Fatal("Failed to load level2:", err)
+				log.Fatal("Failed to load level 2", err)
 			}
-			m.Level = gameMap
-			m.tileHash = makeEbitenImagesFromMap(*gameMap)
+			m.Level = gameMap                              //assign new map
+			m.tileHash = makeEbitenImagesFromMap(*gameMap) //convert tiles in new map
 
 			// reset player position if needed
 			m.player.x = 0
@@ -153,6 +181,9 @@ func (m *mapGame) Update() error {
 
 			// hide gate until next criteria
 			m.showGate = false
+
+			// enable NPCs
+			m.showNPCs = true
 		}
 	}
 
@@ -164,20 +195,30 @@ func (m *mapGame) Update() error {
 		}
 	}
 
+	// update NPCs if visible
+	if m.showNPCs {
+		if m.npc1 != nil {
+			m.npc1.Update()
+		}
+		if m.npc2 != nil {
+			m.npc2.Update()
+		}
+	}
+
 	return nil
 }
 
 func (m *mapGame) Draw(screen *ebiten.Image) {
 	// draw game over screen if triggered
 	if m.gameOver {
-		screen.Fill(colornames.Black)
+		screen.Fill(colornames.Black) //backgroudn black
 		drawFace := text.NewGoXFace(basicfont.Face7x13)
 		textOpts := &text.DrawOptions{}
 		textOpts.GeoM.Reset()
-		textOpts.GeoM.Scale(6.0, 6.0)
+		textOpts.GeoM.Scale(6.0, 6.0) //text size
 		screenW, screenH := ebiten.WindowSize()
 		textOpts.GeoM.Translate(float64(screenW)/2-150, float64(screenH)/2-40)
-		textOpts.ColorScale.ScaleWithColor(colornames.Red)
+		textOpts.ColorScale.ScaleWithColor(colornames.Red) //red text
 		text.Draw(screen, "Game Over", drawFace, textOpts)
 		return
 	}
@@ -220,6 +261,22 @@ func (m *mapGame) Draw(screen *ebiten.Image) {
 		gateOps.GeoM.Scale(0.1, 0.1)
 		gateOps.GeoM.Translate(1220, 1220)
 		world.DrawImage(m.gateImage, &gateOps)
+	}
+
+	// draw NPCs on level 2
+	if m.showNPCs {
+		if m.npc1 != nil {
+			n1Ops := ebiten.DrawImageOptions{}
+			n1Ops.GeoM.Scale(0.40, 0.40) //size up to be visible
+			n1Ops.GeoM.Translate(m.npc1.x, m.npc1.y)
+			world.DrawImage(m.npc1.pict, &n1Ops)
+		}
+		if m.npc2 != nil {
+			n2Ops := ebiten.DrawImageOptions{}
+			n2Ops.GeoM.Scale(0.12, 0.12) //size up to be visible
+			n2Ops.GeoM.Translate(m.npc2.x, m.npc2.y)
+			world.DrawImage(m.npc2.pict, &n2Ops)
+		}
 	}
 
 	playerOps := ebiten.DrawImageOptions{}
@@ -322,6 +379,16 @@ func main() {
 		log.Fatal("Failed to load gate image:", err)
 	}
 
+	// Load NPC images
+	npc1Img, _, err := ebitenutil.NewImageFromFile("NPC1.png")
+	if err != nil {
+		log.Fatal("Failed to load NPC1 image:", err)
+	}
+	npc2Img, _, err := ebitenutil.NewImageFromFile("NPC2.png")
+	if err != nil {
+		log.Fatal("Failed to load NPC2 image:", err)
+	}
+
 	// initialize acorns on map
 	acornList := make([]*acorn, 0)
 	for i := 0; i < 15; i++ {
@@ -332,6 +399,10 @@ func main() {
 	for i := 0; i < 5; i++ {
 		chocolateList = append(chocolateList, NewChocolate(gameMap.Width*gameMap.TileWidth, gameMap.Height*gameMap.TileHeight, chocolateImg))
 	}
+
+	// create NPCs to only show on level2- used AI
+	npc1 := &npc{pict: npc1Img, x: 400, y: 400, dir: 1, speed: 1.5, minX: 350, maxX: 700}
+	npc2 := &npc{pict: npc2Img, x: 800, y: 600, dir: -1, speed: 1.2, minX: 750, maxX: 1000}
 
 	// initialize the game
 	game := &mapGame{
@@ -346,6 +417,11 @@ func main() {
 		chocolateImage: chocolateImg,
 		gateImage:      gateImg,
 		score:          0,
+		npc1:           npc1,
+		npc2:           npc2,
+		npc1Image:      npc1Img,
+		npc2Image:      npc2Img,
+		showNPCs:       false, //npc not displayed until level2
 	}
 
 	fmt.Println("Tilesets loaded:", len(gameMap.Tilesets[0].Tiles))
@@ -353,8 +429,6 @@ func main() {
 		log.Fatal(err)
 	}
 }
-
-// load tiles from tilemap, creatre map.loop through all of the riles and create the image
 func makeEbitenImagesFromMap(tiledMap tiled.Map) map[uint32]*ebiten.Image {
 	idToImage := make(map[uint32]*ebiten.Image)
 
@@ -371,5 +445,6 @@ func makeEbitenImagesFromMap(tiledMap tiled.Map) map[uint32]*ebiten.Image {
 		}
 		idToImage[tile.ID] = ebitenTile
 	}
-	return idToImage //returns the map
+
+	return idToImage
 }

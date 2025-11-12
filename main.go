@@ -428,8 +428,8 @@ func main() {
 	}
 
 	// create NPCs to only show on level2- used AI
-	npc1 := &npc{pict: npc1Img, x: 400, y: 400, dir: 1, speed: 1.5, minX: 350, maxX: 700}
-	npc2 := &npc{pict: npc2Img, x: 800, y: 600, dir: -1, speed: 1.2, minX: 750, maxX: 1000}
+	npc1 := &npc{pict: npc1Img, x: 400, y: 400, dir: 1, speed: 1.5, minX: 0, maxX: 1000}
+	npc2 := &npc{pict: npc2Img, x: 800, y: 600, dir: -1, speed: 1.2, minX: 0, maxX: 1000}
 
 	// initialize the game
 	game := &mapGame{
